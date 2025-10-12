@@ -94,15 +94,19 @@ function createGridOverlay() {
         mapBackground.appendChild(gridOverlay);
     };
     
-    mapImage.src = 'map.jpg';
-}
-
-function removeGridOverlay() {
-    const gridOverlay = document.getElementById('gridOverlay');
-    if (gridOverlay) {
-        gridOverlay.remove();
+        // Respect selected map filename if provided by the page
+        const pageMapBackground = document.getElementById('mapBackground');
+        const selected = (window.selectedMapFilename || (pageMapBackground && pageMapBackground.dataset && pageMapBackground.dataset.map) || 'alliance_map.jpg');
+        const selectedPath = (selected.startsWith('http') || selected.startsWith('/') || selected.startsWith('maps/')) ? selected : ('maps/' + selected);
+        mapImage.src = selectedPath;
     }
-}
+
+    function removeGridOverlay() {
+        const gridOverlay = document.getElementById('gridOverlay');
+        if (gridOverlay) {
+            gridOverlay.remove();
+        }
+    }
 
 // Toggle grid with keyboard shortcut (G key)
 document.addEventListener('keydown', function(event) {

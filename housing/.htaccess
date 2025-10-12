@@ -1,0 +1,78 @@
+# Improve caching policies for static assets to satisfy browser performance audits
+# Place this file in the project root (housing/). Requires apache modules mod_expires and mod_headers.
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+
+    # Images: cache for 30 days (adjust as needed)
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/jpg "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/gif "access plus 30 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/avif "access plus 30 days"
+    ExpiresByType image/svg+xml "access plus 1 month"
+
+    # CSS/JS: cache for 30 days
+    ExpiresByType text/css "access plus 30 days"
+    ExpiresByType text/javascript "access plus 30 days"
+    ExpiresByType application/javascript "access plus 30 days"
+
+    # Fonts: cache long (1 year)
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+    ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
+    ExpiresByType font/ttf "access plus 1 year"
+    ExpiresByType font/otf "access plus 1 year"
+
+    # HTML: no caching by default (so updates are seen quickly)
+    ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+
+<IfModule mod_headers.c>
+    # Images, JS, CSS: public caching
+    <FilesMatch "\.(?:jpg|jpeg|png|gif|webp|avif|svg)$">
+        Header set Cache-Control "public, max-age=2592000, must-revalidate"
+    </FilesMatch>
+    <FilesMatch "\.(?:js|css)$">
+        Header set Cache-Control "public, max-age=2592000, must-revalidate"
+    </FilesMatch>
+    <FilesMatch "\.(?:woff|woff2|ttf|otf|eot)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+
+    # HTML and PHP: do not cache (API responses can be set explicitly in PHP where needed)
+    <FilesMatch "\.(?:html|php)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+
+    # Best practice: support content negotiation and compression caching
+    Header append Vary: Accept-Encoding
+</IfModule>
+
+# If mod_expires/mod_headers are not available, this file harmlessly does nothing.
+# To force JSON API responses to be non-cached, the PHP API already sets headers per response.
+
+    # Simple secret-based protection: redirect unauthenticated requests to auth.php
+    # Exempt static assets, auth endpoints and AJAX API
+    <IfModule mod_rewrite.c>
+        RewriteEngine On
+        # Exempt files we must allow without auth
+        RewriteCond %{REQUEST_URI} \.(?:css|js|jpg|jpeg|png|gif|webp|avif|svg|woff|woff2|ttf|otf|eot)$ [NC]
+        RewriteRule .* - [L]
+        # Exempt the auth form and API endpoints
+        RewriteCond %{REQUEST_URI} ^/housing/auth.php$ [OR]
+        RewriteCond %{REQUEST_URI} ^/housing/api.php$ [OR]
+        RewriteCond %{REQUEST_URI} ^/housing/config.php$ [NC]
+        RewriteRule .* - [L]
+
+        # If the auth cookie exists, allow (cookie is named as in config.php)
+        RewriteCond %{HTTP:Cookie} housing_auth=([^;]+) [NC]
+        RewriteRule .* - [L]
+
+        # Otherwise redirect to auth.php and preserve original path in 'r' param
+        # Use REQUEST_URI so empty-path requests don't become '/'
+        RewriteRule ^ /housing/auth.php?r=%{REQUEST_URI} [R=302,L]
+    </IfModule>

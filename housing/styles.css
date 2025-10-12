@@ -12,24 +12,76 @@ body {
 
 .map-container {
     position: relative;
-    min-width: 1000px;
-    min-height: 100vh;
+    width: 100%;
+    /* reduce the container height by 200px compared to full viewport */
+    min-height: calc(100vh - 200px);
+    display: flex;
+    flex-direction: column; /* stack map above table */
+    align-items: center; /* center children horizontally */
+    justify-content: flex-start;
+    background-color: #1a1a1a;
+    /* create 50px gap between container top and the map */
+    padding-top: 20px;
+    padding-bottom: 20px;
+    /* replace horizontal padding with a hard max-width so the container is clipped by 400px total (200px per side) */
+    max-width: calc(100% - 400px);
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Inner wrapper to keep the map responsively centered like the inline table */
+.map-inner {
+    /* make the visible map viewport responsive: always 95% of the outer container width */
+    width: 98%;
+    max-width: none; /* remove fixed cap so it follows % of container */
+    margin-left: auto;
+    margin-right: auto;
+    /* add a subtle visible border around the viewport so it's clear where the map is shown */
+    border: 2px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6) inset;
+}
+
+/* ensure the zoom wrapper is centered inside the map-inner using flexbox */
+.map-inner {
     display: flex;
     justify-content: center;
-    align-items: center;
-    background-color: #1a1a1a;
+    align-items: flex-start;
+}
+
+/* wrapper that receives CSS scale transform for zooming */
+.zoom-wrapper {
+    transform-origin: 0 0;
+    display: block; /* allow margin auto centering when width is set by JS */
+    width: auto;
+    height: auto;
+    margin: 0; /* centering is handled by .map-inner flex container */
 }
 
 .map-background {
-    background-image: url('map.jpg');
+    /* default background (will be overridden by JS when a map is selected) */
+    background-image: url('maps/alliance_map.jpg');
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    min-width: 1000px;
-    min-height: 600px;
     position: relative;
-    width: 100%;
-    height: 100vh;
+    display: block;
+    width: auto; /* JS will set explicit pixel width/height on load */
+    height: auto;
+}
+
+/* remove any visual frame from the image itself; the viewport (.map-inner) now has the border */
+.map-background { border: none !important; box-shadow: none !important; outline: none !important; border-radius: 0 !important; }
+
+/* allow the map to overflow visually when panned (no scrollbars) */
+.map-container {
+    overflow: visible;
+}
+
+/* ensure the inner wrapper clips the visible area (no scrollbars) */
+.map-inner {
+    overflow: hidden;
+    position: relative;
 }
 
 .grid-overlay {
@@ -80,36 +132,89 @@ body {
 
 .house-plot {
     position: absolute;
-    width: 20px;
-    height: 20px;
-    background-color: rgba(255, 255, 255, 0.8);
-    border: 1px solid #333;
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-weight: bold;
-    color: #333;
+    position: absolute;
+    width: 32px; /* fits icon */
+    height: 32px;
+    background: transparent;
+    display: block;
     cursor: pointer;
-    transition: all 0.2s ease;
-    z-index: 10;
-}
-
-.house-plot:hover {
-    background-color: rgba(255, 255, 255, 1);
-    transform: scale(1.1);
+    transition: transform 0.15s ease;
     z-index: 20;
 }
 
-.house-plot.occupied {
-    background-color: rgba(76, 175, 80, 0.8);
-    color: white;
+.house-plot:hover { z-index: 40; }
+
+
+/* There is only one status: 'interested' - handled via .interested class */
+
+/* Remove heavy outline; use a pulsing dot indicator instead */
+
+
+/* small filled green dot behind the house icon to indicate occupied/interested */
+.plot-dot {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: rgba(76,175,80,1);
+    box-shadow: 0 2px 6px rgba(76,175,80,0.45);
+    left: 50%;
+    top: 50%;
+    z-index: 30; /* above icon so the dot is always visible */
+    opacity: 0;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    /* allow JS to scale via --dot-scale while CSS handles translate and animation */
+    transform: translate(-50%, -50%) scale(var(--dot-scale, 1));
 }
 
-.house-plot.occupied:hover {
-    background-color: rgba(76, 175, 80, 1);
+/* Slightly offset dot downward so it sits just below icon center (baseline) */
+.house-plot .plot-dot { transform: translate(-50%, 12px) scale(var(--dot-scale, 1)); }
+
+/* Show dot when interested (single status) */
+.house-plot.interested .plot-dot {
+    opacity: 1;
+    transform: translate(-50%, -38%) scale(var(--dot-scale, 1));
+    animation: plot-dot-pulse 1.25s ease-in-out infinite;
 }
+
+@keyframes plot-dot-pulse {
+    0% { transform: translate(-50%, -38%) scale(calc(var(--dot-scale, 1) * 0.92)); }
+    50% { transform: translate(-50%, -38%) scale(calc(var(--dot-scale, 1) * 1.18)); }
+    100% { transform: translate(-50%, -38%) scale(calc(var(--dot-scale, 1) * 0.92)); }
+}
+
+/* Large preview panel shown on hover near cursor */
+#plotHoverPreview {
+    position: fixed;
+    display: none;
+    z-index: 1001;
+    background: rgba(18,18,18,0.95);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 10px;
+    border-radius: 8px;
+    min-width: 280px;
+    max-width: 420px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+#plotHoverPreview img.preview-img {
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    display: block;
+    margin-bottom: 8px;
+}
+#plotHoverPreview .preview-meta {
+    font-size: 13px;
+    color: #ddd;
+}
+#plotHoverPreview .preview-meta .plot-number {
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+/* hover scaling is handled by .house-plot:hover */
 
 .plot-info {
     position: absolute;
@@ -131,22 +236,118 @@ body {
     opacity: 1;
 }
 
+/* Icon images are rendered as background-image on the .house-plot container (see createHousePlots) */
+/* Inner icon element used to render the house graphic above the dot */
+.house-plot .house-icon {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    /* use CSS variable for scale so JS can update it without overriding hover transform */
+    transform: translate(-50%, -38%) scale(var(--icon-scale, 1));
+    width: 32px;
+    height: 32px;
+    pointer-events: none;
+    z-index: 20; /* above the dot */
+    transition: transform 0.12s ease;
+    /* ensure the icon acts as a positioning context for its child label */
+    display: block;
+}
+
+/* Hover scaling applies to the icon only (multiplies the current icon scale) */
+.house-plot:hover .house-icon {
+    transform: translate(-50%, -38%) scale(calc(var(--icon-scale, 1) * 1.05));
+}
+
+/* Small label showing the plot number next to the icon */
+.plot-number-label {
+    position: absolute;
+    /* default: center-right relative to the plot container */
+    left: 50%;
+    top: 50%;
+    transform: translate(12px, -50%) scale(var(--label-scale, 1));
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    z-index: 25;
+    pointer-events: none; /* clicks pass through to the plot container */
+    white-space: nowrap;
+}
+
+/* When the label is anchored inside the icon, position it just outside the icon's right edge */
+.house-plot .house-icon > .plot-number-label {
+    left: 100%;
+    top: 50%;
+    transform: translate(8px, -50%) scale(var(--label-scale, 1));
+    transform-origin: left center;
+}
+
+/* Hidden state for plot numbers */
+.plot-number-label.hidden { display: none !important; }
+
+/* Legend toggle active appearance */
+#togglePlotNumbersBtn.active {
+    background: linear-gradient(180deg, #3a3a3a, #2b2b2b);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: #fff;
+}
+
+/* Debug cross showing the computed scaled map coordinates for each plot */
+/* debug-cross removed */
+
+/* Plot editing modal */
+.plot-table-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0,0,0,0.6);
+    z-index: 300;
+}
+.plot-table-card {
+    background: #1e1e1e;
+    color: #fff;
+    padding: 16px;
+    border-radius: 8px;
+    width: 640px;
+    max-width: calc(100% - 40px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+.plot-table-card table th, .plot-table-card table td {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding: 8px 6px;
+}
+.plot-table-card input[type="text"] {
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid #333;
+    background: #111;
+    color: #fff;
+}
+
+/* we save inline, so hide the explicit Save button */
+#plotSaveBtn { display:none; }
+
 .legend {
     position: fixed;
     top: 20px;
     right: 20px;
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: rgba(0, 0, 0, 0.85);
     color: white;
-    padding: 15px;
-    border-radius: 8px;
-    font-size: 12px;
+    padding: 18px 16px;
+    border-radius: 10px;
+    font-size: 13px;
     z-index: 100;
+    width: 210px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
 }
 
 .legend-item {
     display: flex;
     align-items: center;
-    margin-bottom: 5px;
+    margin-bottom: 10px;
 }
 
 .legend-color {
@@ -160,13 +361,178 @@ body {
     background-color: rgba(255, 255, 255, 0.8);
 }
 
-.legend-color.occupied {
-    background-color: rgba(76, 175, 80, 0.8);
+.legend-color.interested {
+    background-color: rgba(76, 175, 80, 0.9);
 }
+
+.legend .legend-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+/* Locale flag buttons (small, square) */
+.locale-flags { display:flex; gap:6px; }
+.locale-flag-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 6px 8px;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #fff;
+}
+.locale-flag-btn:hover, .locale-flag-btn:focus { background: rgba(255,255,255,0.03); }
+.locale-flag-btn.active {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6) inset;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+}
+
+/* Size the inline SVG flags to fit inside the button */
+.locale-flag { width: 20px; height: auto; display: block; }
+
+/* Simple spinner used while loading modal images */
+.plot-image-spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.08);
+    border-top-color: rgba(255,255,255,0.6);
+    animation: spin 1s linear infinite;
+    margin: 8px auto 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Alliance / Horde legend buttons coloring */
+#chooseAllianceLegend {
+    background: linear-gradient(180deg, #1e6fff, #155be0);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+}
+#chooseAllianceLegend:hover, #chooseAllianceLegend:focus {
+    background: linear-gradient(180deg, #2a77ff, #186af0);
+}
+
+#chooseHordeLegend {
+    background: linear-gradient(180deg, #e03b3b, #b02828);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+}
+#chooseHordeLegend:hover, #chooseHordeLegend:focus {
+    background: linear-gradient(180deg, #ff5252, #c93b3b);
+}
+
+/* Debug marker style (temporary) */
+
 
 @media (max-width: 1000px) {
     .map-container {
         min-width: 1000px;
         overflow: auto;
     }
+}
+
+/* Modal for map selection */
+.map-select-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0,0,0,0.6);
+    z-index: 200;
+}
+.map-select-card {
+    background: #1e1e1e;
+    color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    width: 420px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+.map-options {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+.map-option {
+    flex: 1;
+    padding: 10px 12px;
+    background: #2b2b2b;
+    color: #fff;
+    border: 1px solid #444;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.map-option:hover { background: #3a3a3a; }
+.remember-label { display: block; margin-top: 10px; font-size: 13px; }
+
+/* Compact inline plot grid */
+.inline-plot-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    align-items: start;
+}
+
+/* debug styles removed */
+.plot-card {
+    background: rgba(255,255,255,0.03);
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+.plot-card-header {
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+.plot-card-body input.plot-interested-input {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(0,0,0,0.4);
+    color: #fff;
+}
+
+@media (max-width: 1200px) {
+    .inline-plot-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+    .inline-plot-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+    .inline-plot-grid { grid-template-columns: 1fr; }
+}
+
+/* Plot image modal */
+.plot-image-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.7);
+    z-index: 9999; /* increased to ensure modal sits above other overlays */
+}
+.plot-image-card {
+    position: relative;
+    padding: 18px;
+    background: #111;
+    border-radius: 8px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+    max-width: 95%;
+}
+.plot-image-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    color: #fff;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
 }
